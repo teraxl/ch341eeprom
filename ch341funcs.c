@@ -57,8 +57,6 @@ struct libusb_device_handle *ch341configure(uint16_t vid, uint16_t pid) {
         return NULL;
     }
 
-
-
     #if LIBUSBX_API_VERSION < 0x01000106
         libusb_set_debug(NULL, 3);                  // maximum debug logging level
     #else
@@ -123,6 +121,7 @@ struct libusb_device_handle *ch341configure(uint16_t vid, uint16_t pid) {
         return NULL;
     }
 
+	// commit
     fprintf(verbout, "Device reported its revision [%d.%02d]\n",
         ch341DescriptorBuffer[12], ch341DescriptorBuffer[13]);
 
