@@ -6,10 +6,19 @@
 #include <string.h>
 #include <assert.h>
 
+#define USB_LOCK_VENDOR 0x046d
+#define USB_LOCK_PRODUCT 0x0a45
+#define DEFAULT_INTERFACE 0x00
+#define DEFAULT_CONFIGURATION 0x01
+
+#define TRUE 1
+#define FALSE 0
+
 FILE *debugout, *verbout;
 
 struct libusb_device_handle *ch341configure(uint16_t vid, uint16_t pid) {
 	
+	int i;
 	struct libusb_device *dev;
 	struct libusb_device_handle *devHandle;
 	int32_t ret = 0;
@@ -54,7 +63,7 @@ struct libusb_device_handle *ch341configure(uint16_t vid, uint16_t pid) {
 		ret = libusb_detach_kernel_driver(devHandle, DEFAULT_INTERFACE);
 		if (ret) {
 			fprintf(stderr, "Failed to detach kernel driver: '%s'\n",
-					stderror(-ret));
+					strerror(-ret));
 			return NULL;
 		} else {
 			fprintf(verbout, "Detached kernel driver\n");
@@ -64,7 +73,7 @@ struct libusb_device_handle *ch341configure(uint16_t vid, uint16_t pid) {
 	ret = libusb_get_configuration(devHandle, &currentConfig);
 	if (ret) {
 		fprintf(stderr, "Failed to get current device configuration: '%s'\n",
-				stderror(-ret));
+				strerror(-ret));
 		return NULL;
 	}
 
@@ -74,7 +83,7 @@ struct libusb_device_handle *ch341configure(uint16_t vid, uint16_t pid) {
 
 	if (ret) {
 		fprintf(stderr, "Failed to set device configuration to %d: '%s'\n",
-				DEFAULT_CONFIGURATION, stderror(-ret));
+				DEFAULT_CONFIGURATION, strerror(-ret));
 		return NULL;
 	}
 
@@ -82,28 +91,46 @@ struct libusb_device_handle *ch341configure(uint16_t vid, uint16_t pid) {
 
 	if (ret) {
 		fprintf(stderr, "Failed to claim interface %d: '%s'\n",
-				DEFAULT_INTERFACE, stderror(-ret));
+				DEFAULT_INTERFACE, strerror(-ret));
 		return NULL;
 	}
 
 	fprintf(verbout, "Claim device interface [%d]\n", DEFAULT_INTERFACE);
 
 	ret = libusb_get_descriptor(devHandle, LIBUSB_DT_DEVICE,
-			0x00, ch341DEscriptorBuffer, 0x12);
+			0x00, ch341DescriptorBuffer, 0x12);
 
 	if (ret < 0) {
 		fprintf(stderr, "failed to get device descriptor: '%s'\n", 
 				strerror(-ret));
 		return NULL;
 	}
+
+	fprintf(verbout, "Device reported its revision [%d.%02d]\n",
+			ch341DescriptorBuffer[12], ch341DescriptorBuffer[13]);
+	
+	for (i=0; i < 0x12; i++) {
+		fprintf(debugout, "%02x ", ch341DescriptorBuffer[i]);	
+	}
+	
+	fprintf(debugout, "\n");
+
+	return devHandle;
 }
 
 int main(int argc, char **argv) {
 	
+	struct libusb_device_handle *devHandle = NULL;
+	uint8_t debug = FALSE, verbose = FALSE;
 	debugout = (debug == TRUE) ? stdout : fopen("/dev/null", "w");
-	verbout = (verbout == TRUE) ? stdout : fopen("/dev/null", "w");
+	verbout = (verbose == TRUE) ? stdout : fopen("/dev/null", "w");
 	fprintf(debugout, "Debug Enabled\n");
 
+	
+	devHandle = ch341configure(USB_LOCK_VENDOR, USB_LOCK_PRODUCT);
+	
 
-
+	libusb_release_interface(devHandle, DEFAULT_INTERFACE);
+	libusb_close(devHandle);
+	libusb_exit(NULL);
 }
